@@ -1,36 +1,59 @@
-
 pipeline {
     agent any
+
     triggers {
-        cron('H/3 * * * 1') // Trigger every 3 minutes on Mondays
+        cron('H/3 * * * 1')
     }
+
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out the source code'
                 checkout scm
             }
         }
+
         stage('Build') {
             steps {
-                echo 'Starting Build Stage'
-                bat 'mvnw.cmd clean package' // Use mvnw.cmd for Windows
-                echo 'Build Stage Completed'
+                script {
+                    if (isUnix()) {
+                        sh './mvnw clean package'
+                    } else {
+                        bat 'mvnw.cmd clean package'
+                    }
+                }
             }
         }
-        stage('Code Coverage Report') {
+
+        stage('Test') {
             steps {
-                echo 'Running Code Coverage Report'
-                bat 'mvnw.cmd test jacoco:report' // Use mvnw.cmd for Windows
-                echo 'Code Coverage Report Generated'
+                script {
+                    if (isUnix()) {
+                        sh './mvnw test'
+                    } else {
+                        bat 'mvnw.cmd test'
+                    }
+                }
+            }
+        }
+
+        stage('Jacoco Report') {
+            steps {
+                jacoco(
+                    execPattern: '/target/*.exec',
+                    classPattern: '/classes',
+                    sourcePattern: '/src/main/java',
+                    inclusionPattern: '/*.class',
+                    exclusionPattern: '/*Test.class'
+                )
             }
         }
     }
+
     post {
         always {
-            echo 'Archiving artifacts and generating reports'
-            archiveArtifacts artifacts: '/target/*.jar', fingerprint: true
-            jacoco execPattern: '/target/jacoco.exec', classPattern: '/classes', sourcePattern: '/src/main/java'
+            archiveArtifacts artifacts: '/target/*.jar', allowEmptyArchive: true
+            junit '/target/surefire-reports/*.xml'
+            jacoco()
         }
     }
 }
