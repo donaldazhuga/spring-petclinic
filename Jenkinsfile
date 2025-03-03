@@ -1,59 +1,35 @@
 pipeline {
     agent any
-
     triggers {
-        cron('H/3 * * * 1')
+        cron('H/3 * * * 1') // Trigger every 3 minutes on Mondays
     }
-
     stages {
         stage('Checkout') {
             steps {
+                echo 'Checking out the source code'
                 checkout scm
             }
         }
-
         stage('Build') {
             steps {
-                script {
-                    if (isUnix()) {
-                        sh './mvnw clean package'
-                    } else {
-                        bat 'mvnw.cmd clean package'
-                    }
-                }
+                echo 'Starting Build Stage'
+                bat 'mvnw.cmd clean package' // Use mvnw.cmd for Windows
+                echo 'Build Stage Completed'
             }
         }
-
-        stage('Test') {
+        stage('Code Coverage Report') {
             steps {
-                script {
-                    if (isUnix()) {
-                        sh './mvnw test'
-                    } else {
-                        bat 'mvnw.cmd test'
-                    }
-                }
-            }
-        }
-
-        stage('Jacoco Report') {
-            steps {
-                jacoco(
-                    execPattern: '/target/*.exec',
-                    classPattern: '/classes',
-                    sourcePattern: '/src/main/java',
-                    inclusionPattern: '/*.class',
-                    exclusionPattern: '/*Test.class'
-                )
+                echo 'Running Code Coverage Report'
+                bat 'mvnw.cmd test jacoco:report' // Use mvnw.cmd for Windows
+                echo 'Code Coverage Report Generated'
             }
         }
     }
-
     post {
         always {
-            archiveArtifacts artifacts: '/target/*.jar', allowEmptyArchive: true
-            junit '/target/surefire-reports/*.xml'
-            jacoco()
+            echo 'Archiving artifacts and generating reports'
+            archiveArtifacts artifacts: '/target/*.jar', fingerprint: true
+            jacoco execPattern: '/target/jacoco.exec', classPattern: '/classes', sourcePattern: '/src/main/java'
         }
     }
 }
